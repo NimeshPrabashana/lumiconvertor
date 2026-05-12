@@ -193,10 +193,9 @@ async function loadFFmpeg() {
   setProgress(5, 'Loading Lumi engine...');
 
   try {
-    const { FFmpeg } = await import('https://unpkg.com/@ffmpeg/ffmpeg@0.12.6/dist/esm/index.js');
-    const { toBlobURL, fetchFile: ff } = await import('https://unpkg.com/@ffmpeg/util@0.12.1/dist/esm/index.js');
+    const { FFmpeg } = await import('https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.6/dist/esm/index.js');
+    const { toBlobURL, fetchFile: ff } = await import('https://cdn.jsdelivr.net/npm/@ffmpeg/util@0.12.1/dist/esm/index.js');
 
-    // store fetchFile globally for use in conversion
     window._lumiFF = ff;
 
     ffmpeg = new FFmpeg();
@@ -210,11 +209,19 @@ async function loadFFmpeg() {
       console.log('[FFmpeg]', message);
     });
 
-    const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm';
-    await ffmpeg.load({
-      coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
-      wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
-    });
+    // Try jsdelivr first, fallback to unpkg
+    let coreURL, wasmURL;
+    try {
+      const base = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/esm';
+      coreURL = await toBlobURL(`${base}/ffmpeg-core.js`, 'text/javascript');
+      wasmURL = await toBlobURL(`${base}/ffmpeg-core.wasm`, 'application/wasm');
+    } catch {
+      const base = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm';
+      coreURL = await toBlobURL(`${base}/ffmpeg-core.js`, 'text/javascript');
+      wasmURL = await toBlobURL(`${base}/ffmpeg-core.wasm`, 'application/wasm');
+    }
+
+    await ffmpeg.load({ coreURL, wasmURL });
 
     ffmpegLoaded = true;
     setProgress(10, 'Engine ready!');
