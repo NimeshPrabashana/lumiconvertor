@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Lumi Converter</title>
+  <link rel="stylesheet" href="style.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+</head>
+<body>
+  <div class="bg-glow"></div>
+
+  <div class="container">
+    <!-- Header -->
+    <header>
+      <div class="logo">
+        <span class="logo-icon">✦</span>
+        <span class="logo-text">Lumi <span class="logo-accent">Converter</span></span>
+      </div>
+      <p class="tagline">Convert videos, audio & photos — right in your browser</p>
+    </header>
+
+    <!-- Type Selector -->
+    <div class="type-tabs" id="typeTabs">
+      <button class="tab active" data-type="video">🎬 Video</button>
+      <button class="tab" data-type="audio">🎵 Audio</button>
+      <button class="tab" data-type="image">🖼️ Image</button>
+    </div>
+
+    <!-- Drop Zone -->
+    <div class="drop-zone" id="dropZone">
+      <div class="drop-inner">
+        <div class="drop-icon" id="dropIcon">🎬</div>
+        <p class="drop-title">Drag & Drop your file here</p>
+        <p class="drop-sub">or</p>
+        <label class="btn-browse" for="fileInput">Browse File</label>
+        <input type="file" id="fileInput" hidden />
+        <p class="drop-formats" id="dropFormats">AVI · MOV · MKV · MP4 · WEBM · FLV</p>
+      </div>
+    </div>
+
+    <!-- File Info & Options -->
+    <div class="card" id="fileCard" style="display:none;">
+      <div class="file-row">
+        <div class="file-thumb" id="fileThumb">🎬</div>
+        <div class="file-meta">
+          <p class="file-name" id="fileName">video.avi</p>
+          <p class="file-size" id="fileSize">0 MB</p>
+        </div>
+        <button class="btn-icon" id="removeFile" title="Remove file">✕</button>
+      </div>
+
+      <div class="options-row">
+        <div class="option-group">
+          <label>Output Format</label>
+          <select id="outputFormat">
+            <option value="">-- Select --</option>
+          </select>
+        </div>
+        <div class="option-group" id="qualityGroup">
+          <label>Quality</label>
+          <select id="quality">
+            <option value="high">High</option>
+            <option value="medium" selected>Medium</option>
+            <option value="low">Low</option>
+          </select>
+        </div>
+      </div>
+
+      <button class="btn-convert" id="convertBtn" disabled>
+        <span>Convert Now</span>
+        <span class="btn-arrow">→</span>
+      </button>
+    </div>
+
+    <!-- Progress -->
+    <div class="card" id="progressCard" style="display:none;">
+      <p class="progress-label" id="progressLabel">Initializing Lumi...</p>
+      <div class="progress-track">
+        <div class="progress-fill" id="progressFill"></div>
+      </div>
+      <p class="progress-percent" id="progressPercent">0%</p>
+    </div>
+
+    <!-- Result -->
+    <div class="card result-card" id="resultCard" style="display:none;">
+      <div class="result-icon">✅</div>
+      <p class="result-title">Conversion Complete!</p>
+      <div id="previewArea"></div>
+      <a class="btn-download" id="downloadBtn" download>⬇ Download File</a>
+      <button class="btn-ghost" id="newConversion">Convert Another</button>
+    </div>
+
+    <!-- Error -->
+    <div class="card error-card" id="errorCard" style="display:none;">
+      <div class="result-icon">❌</div>
+      <p class="result-title">Something went wrong</p>
+      <p class="error-msg" id="errorMsg"></p>
+      <button class="btn-ghost" id="retryBtn">Try Again</button>
+    </div>
+
+    <footer>
+      <p>Lumi Converter · Powered by FFmpeg.wasm · No files leave your device</p>
+    </footer>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
