@@ -1,11 +1,12 @@
 // ===== Lumi Converter - app.js =====
+// Uses @ffmpeg/ffmpeg v0.11.x (stable, widely supported)
 
 // Format definitions per type
 const FORMATS = {
   video: {
     accept: 'video/*',
     input: ['mp4', 'avi', 'mov', 'mkv', 'webm', 'flv', 'wmv', 'm4v', '3gp'],
-    output: ['mp4', 'webm', 'avi', 'mov', 'mkv', 'gif'],
+    output: ['mp4', 'webm', 'avi', 'mov', 'gif'],
     icon: '🎬',
     label: 'AVI · MOV · MKV · MP4 · WEBM · FLV · WMV',
     quality: true,
@@ -13,22 +14,21 @@ const FORMATS = {
   audio: {
     accept: 'audio/*',
     input: ['mp3', 'wav', 'ogg', 'flac', 'aac', 'm4a', 'wma', 'opus'],
-    output: ['mp3', 'wav', 'ogg', 'aac', 'flac', 'm4a'],
+    output: ['mp3', 'wav', 'ogg', 'aac', 'flac'],
     icon: '🎵',
     label: 'MP3 · WAV · OGG · FLAC · AAC · M4A',
     quality: true,
   },
   image: {
     accept: 'image/*',
-    input: ['jpg', 'jpeg', 'png', 'webp', 'bmp', 'gif', 'tiff', 'ico'],
-    output: ['jpg', 'png', 'webp', 'bmp', 'gif'],
+    input: ['jpg', 'jpeg', 'png', 'webp', 'bmp', 'gif', 'tiff'],
+    output: ['jpg', 'png', 'webp', 'bmp'],
     icon: '🖼️',
     label: 'JPG · PNG · WEBP · BMP · GIF · TIFF',
     quality: false,
   },
 };
 
-// Quality presets
 const QUALITY_PRESETS = {
   video: {
     high:   ['-crf', '18', '-preset', 'slow'],
@@ -117,23 +117,17 @@ dropZone.addEventListener('dragover', e => {
   e.preventDefault();
   dropZone.classList.add('dragover');
 });
-
-dropZone.addEventListener('dragleave', () => {
-  dropZone.classList.remove('dragover');
-});
-
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
 dropZone.addEventListener('drop', e => {
   e.preventDefault();
   dropZone.classList.remove('dragover');
   const file = e.dataTransfer.files[0];
   if (file) handleFile(file);
 });
-
 dropZone.addEventListener('click', (e) => {
   if (e.target.classList.contains('btn-browse')) return;
   fileInput.click();
 });
-
 fileInput.addEventListener('change', () => {
   if (fileInput.files[0]) handleFile(fileInput.files[0]);
 });
@@ -142,17 +136,14 @@ fileInput.addEventListener('change', () => {
 function handleFile(file) {
   const ext = file.name.split('.').pop().toLowerCase();
   const allowed = FORMATS[currentType].input;
-
   if (!allowed.includes(ext)) {
-    showError(`"${ext.toUpperCase()}" format is not supported for ${currentType} conversion.\nSupported: ${allowed.join(', ').toUpperCase()}`);
+    showError(`"${ext.toUpperCase()}" format is not supported for ${currentType}.\nSupported: ${allowed.join(', ').toUpperCase()}`);
     return;
   }
-
   selectedFile = file;
   fileNameEl.textContent = file.name;
   fileSizeEl.textContent = formatSize(file.size);
   fileThumb.textContent = FORMATS[currentType].icon;
-
   dropZone.style.display = 'none';
   fileCard.style.display = 'block';
   hideAll(['progressCard', 'resultCard', 'errorCard']);
@@ -166,11 +157,9 @@ function formatSize(bytes) {
 }
 
 outputFormat.addEventListener('change', updateConvertBtn);
-
 function updateConvertBtn() {
   convertBtn.disabled = !outputFormat.value;
 }
-
 removeFileBtn.addEventListener('click', resetAll);
 
 function resetAll() {
@@ -180,54 +169,39 @@ function resetAll() {
   convertBtn.disabled = true;
   dropZone.style.display = 'block';
   hideAll(['fileCard', 'progressCard', 'resultCard', 'errorCard']);
-  if (outputURL) {
-    URL.revokeObjectURL(outputURL);
-    outputURL = null;
-  }
+  if (outputURL) { URL.revokeObjectURL(outputURL); outputURL = null; }
 }
 
-// ===== FFmpeg Init =====
+// ===== FFmpeg Load (v0.12 with proper CORS headers via Edge Function) =====
 async function loadFFmpeg() {
   if (ffmpegLoaded) return;
-
   setProgress(5, 'Loading Lumi engine...');
 
   try {
-    const { FFmpeg } = await import('https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.6/dist/esm/index.js');
-    const { toBlobURL, fetchFile: ff } = await import('https://cdn.jsdelivr.net/npm/@ffmpeg/util@0.12.1/dist/esm/index.js');
-
+    const { FFmpeg } = await import('https://unpkg.com/@ffmpeg/ffmpeg@0.12.6/dist/esm/index.js');
+    const { toBlobURL, fetchFile: ff } = await import('https://unpkg.com/@ffmpeg/util@0.12.1/dist/esm/index.js');
     window._lumiFF = ff;
 
     ffmpeg = new FFmpeg();
-
     ffmpeg.on('progress', ({ progress }) => {
       const pct = Math.round(Math.min(progress, 1) * 100);
       setProgress(10 + pct * 0.85, `Converting... ${pct}%`);
     });
+    ffmpeg.on('log', ({ message }) => console.log('[FFmpeg]', message));
 
-    ffmpeg.on('log', ({ message }) => {
-      console.log('[FFmpeg]', message);
+    setProgress(8, 'Downloading engine (~20MB first time)...');
+
+    const base = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm';
+    await ffmpeg.load({
+      coreURL: await toBlobURL(`${base}/ffmpeg-core.js`, 'text/javascript'),
+      wasmURL: await toBlobURL(`${base}/ffmpeg-core.wasm`, 'application/wasm'),
     });
-
-    // Try jsdelivr first, fallback to unpkg
-    let coreURL, wasmURL;
-    try {
-      const base = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/esm';
-      coreURL = await toBlobURL(`${base}/ffmpeg-core.js`, 'text/javascript');
-      wasmURL = await toBlobURL(`${base}/ffmpeg-core.wasm`, 'application/wasm');
-    } catch {
-      const base = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm';
-      coreURL = await toBlobURL(`${base}/ffmpeg-core.js`, 'text/javascript');
-      wasmURL = await toBlobURL(`${base}/ffmpeg-core.wasm`, 'application/wasm');
-    }
-
-    await ffmpeg.load({ coreURL, wasmURL });
 
     ffmpegLoaded = true;
     setProgress(10, 'Engine ready!');
   } catch (err) {
-    console.error(err);
-    throw new Error('Failed to load conversion engine. Please check your internet connection and try again.');
+    console.error('FFmpeg load error:', err);
+    throw new Error('Failed to load engine. Please refresh and try again.');
   }
 }
 
@@ -257,7 +231,6 @@ async function startConversion() {
     await ffmpeg.writeFile(inputName, fileData);
 
     setProgress(15, 'Starting conversion...');
-
     const args = buildArgs(inputName, outputName, outputExt, qualVal);
     await ffmpeg.exec(args);
 
@@ -267,16 +240,16 @@ async function startConversion() {
     const blob = new Blob([data.buffer], { type: mimeType });
     outputURL = URL.createObjectURL(blob);
 
-    // Cleanup ffmpeg virtual FS
-    await ffmpeg.deleteFile(inputName);
-    await ffmpeg.deleteFile(outputName);
+    // Cleanup
+    ffmpeg.deleteFile(inputName);
+    ffmpeg.deleteFile(outputName);
 
     setProgress(100, 'Done!');
     setTimeout(() => showResult(outputURL, outputExt), 400);
 
   } catch (err) {
-    console.error(err);
-    showError(err.message || 'Conversion failed. Please try a different format or file.');
+    console.error('Conversion error:', err);
+    showError(err.message || 'Conversion failed. Please try a different format.');
   }
 }
 
@@ -287,18 +260,18 @@ function buildArgs(inputName, outputName, outputExt, qualVal) {
     if (outputExt === 'gif') {
       args.push('-vf', 'fps=10,scale=480:-1:flags=lanczos', '-loop', '0');
     } else {
-      const qArgs = QUALITY_PRESETS.video[qualVal] || QUALITY_PRESETS.video.medium;
-      args.push(...qArgs, '-c:v', 'libx264', '-c:a', 'aac');
+      const q = QUALITY_PRESETS.video[qualVal] || QUALITY_PRESETS.video.medium;
+      args.push(...q, '-c:v', 'libx264', '-c:a', 'aac', '-movflags', '+faststart');
     }
   } else if (currentType === 'audio') {
-    const qArgs = QUALITY_PRESETS.audio[qualVal] || QUALITY_PRESETS.audio.medium;
-    args.push(...qArgs);
+    const q = QUALITY_PRESETS.audio[qualVal] || QUALITY_PRESETS.audio.medium;
+    args.push(...q);
     if (outputExt === 'ogg') args.push('-c:a', 'libvorbis');
     else if (outputExt === 'flac') args.push('-c:a', 'flac');
     else args.push('-c:a', 'libmp3lame');
   } else if (currentType === 'image') {
-    const qArgs = QUALITY_PRESETS.image[qualVal] || QUALITY_PRESETS.image.medium;
-    args.push(...qArgs);
+    const q = QUALITY_PRESETS.image[qualVal] || QUALITY_PRESETS.image.medium;
+    args.push(...q);
   }
 
   args.push(outputName);
@@ -308,9 +281,9 @@ function buildArgs(inputName, outputName, outputExt, qualVal) {
 function getMimeType(ext) {
   const map = {
     mp4: 'video/mp4', webm: 'video/webm', avi: 'video/x-msvideo',
-    mov: 'video/quicktime', mkv: 'video/x-matroska', gif: 'image/gif',
+    mov: 'video/quicktime', gif: 'image/gif',
     mp3: 'audio/mpeg', wav: 'audio/wav', ogg: 'audio/ogg',
-    aac: 'audio/aac', flac: 'audio/flac', m4a: 'audio/mp4',
+    aac: 'audio/aac', flac: 'audio/flac',
     jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png',
     webp: 'image/webp', bmp: 'image/bmp',
   };
@@ -337,10 +310,9 @@ function showResult(url, ext) {
     previewArea.appendChild(el);
   } else if (currentType === 'audio') {
     const el = document.createElement('audio');
-    el.src = url;
-    el.controls = true;
+    el.src = url; el.controls = true;
     previewArea.appendChild(el);
-  } else if (currentType === 'image') {
+  } else {
     const el = document.createElement('img');
     el.src = url;
     previewArea.appendChild(el);
@@ -371,12 +343,8 @@ newConvBtn.addEventListener('click', () => {
   resetAll();
 });
 
-// ===== Helpers =====
 function hideAll(ids) {
-  ids.forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.style.display = 'none';
-  });
+  ids.forEach(id => { const el = document.getElementById(id); if (el) el.style.display = 'none'; });
 }
 
 // ===== Init =====
